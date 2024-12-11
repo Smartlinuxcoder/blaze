@@ -32,14 +32,19 @@ func (t *Transpiler) processLine(line string) string {
 		importPath := strings.TrimPrefix(line, "import ")
 		return fmt.Sprintf("\t\"%s\"", importPath)
 	}
+	//No jank
+	if idx := strings.Index(line, ":="); idx >= 0 {
+		beforeAssignment := strings.TrimSpace(line[:idx])
+		afterAssignment := strings.TrimSpace(line[idx+2:])
 
-	// Existing error handling for http.Get and io.ReadAll
-	if strings.Contains(line, "http.Get(") {
-		return strings.Replace(line, ":= http.Get", ", err := http.Get", 1)
-	}
-
-	if strings.Contains(line, "io.ReadAll(") {
-		return strings.Replace(line, ":= io.ReadAll", ", err := io.ReadAll", 1)
+		// Check if it's a function call (contains parentheses)
+		if strings.Contains(afterAssignment, "(") && strings.Contains(afterAssignment, ")") {
+			vars := strings.Split(beforeAssignment, ",")
+			if len(vars) == 1 { // Single return value
+				// Add err variable because go is goofy
+				return strings.Replace(line, ":=", ", err :=", 1)
+			}
+		}
 	}
 
 	return line
