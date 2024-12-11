@@ -25,7 +25,7 @@ func main() {
 	// Check for command-line arguments
 	if len(os.Args) > 1 {
 		command := os.Args[1]
-		if command == "run" || command == "build" {
+		if command == "run" || command == "build" || command == "transpile" {
 			if len(os.Args) > 2 {
 				fileName = os.Args[2] // If a file is provided, use it
 			}
@@ -34,9 +34,12 @@ func main() {
 				//run(fileName)
 			case "build":
 				build(fileName)
+
+			case "transpile":
+				transpile(fileName)
 			}
 		} else {
-			fmt.Println("Invalid command. Use 'run' or 'build'.")
+			fmt.Println("Invalid command. Use 'run', 'build' or 'transpile'.")
 		}
 	} else {
 		// Fallback
@@ -55,8 +58,8 @@ func build(fileName string) {
 	sourceCode := string(content)
 	transpiler := NewTranspiler(sourceCode)
 	result := transpiler.Transpile()
-	fmt.Println("Transpiled Go code:")
-	fmt.Println(result)
+	/* 	fmt.Println("Transpiled Go code:")
+	   	fmt.Println(result) */
 	randomString, err := randomString(10)
 	if err != nil {
 		fmt.Println("Error generating random string:", err)
@@ -75,5 +78,22 @@ func build(fileName string) {
 	err = os.Remove(fmt.Sprintf("%s.go", computedname))
 	if err != nil {
 		fmt.Printf("Error removing temporary file: %v\n", err)
+	}
+}
+
+func transpile(fileName string) {
+	content, err := os.ReadFile(fileName)
+	if err != nil {
+		fmt.Printf("Error reading file %s: %v\n", fileName, err)
+		return
+	}
+	filestrings := strings.Split(fileName, ".")
+	sourceCode := string(content)
+	transpiler := NewTranspiler(sourceCode)
+	result := transpiler.Transpile()
+
+	err = os.WriteFile(fmt.Sprintf("%s.go", filestrings[0]), []byte(result), 0644)
+	if err != nil {
+		fmt.Printf("Error writing file: %v\n", err)
 	}
 }
