@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -27,11 +28,18 @@ func main() {
 		command := os.Args[1]
 		if command == "run" || command == "build" || command == "transpile" {
 			if len(os.Args) > 2 {
-				fileName = os.Args[2] // If a file is provided, use it
+				fileName = os.Args[2] // If a file is provided, use it lmao
 			}
 			switch command {
 			case "run":
-				//run(fileName)
+				build(fileName)
+				cmd := exec.Command("./" + strings.Split(fileName, ".")[0])
+				output, err := cmd.CombinedOutput()
+				if err != nil {
+					log.Fatalf("Error executing command: %v", err)
+				}
+				fmt.Println(string(output))
+
 			case "build":
 				build(fileName)
 
