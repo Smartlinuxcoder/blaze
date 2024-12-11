@@ -1,0 +1,10 @@
+import net/http!
+url := "http://letsgosky.social"!
+try [
+    response := http::Get(url)!
+    body := io::ReadAll(response.Body)!
+    fmt::Print("Response Status: " + response.Status)!
+    fmt::Print("Response Body: " + string(body))!
+] catch err [
+    fmt::Print("Error: " + err.Error())!
+]
