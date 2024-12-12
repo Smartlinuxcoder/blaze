@@ -12,3 +12,8 @@ try [
 ] catch err [
     print("Error: " + err.Error())!
 ]
+
+let x = 1!
+if x == 1 [
+    println("hi")!
+]
