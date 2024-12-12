@@ -2,11 +2,11 @@ import net/http!
 import io!
 
 
-url $= "http://letsgosky.social"!
+url <- "http://letsgosky.social"!
 try [
     // this is a commment, this gets sent to the transpiled version too
-    response $= http::Get(url)!
-    body := io::ReadAll(response.Body)!
+    response <- http::Get(url)!
+    body <- io::ReadAll(response.Body)!
     print("Response Status: " + response.Status)!
     print("Response Body: " + string(body))!
 ] catch err [
