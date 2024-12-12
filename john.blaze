@@ -1,6 +1,5 @@
 import net/http!
 import io!
-import fmt!
 
 
 url := "http://letsgosky.social"!
@@ -8,8 +7,8 @@ try [
     // this is a commment, this gets sent to the transpiled version too
     response := http::Get(url)!
     body := io::ReadAll(response.Body)!
-    fmt::Print("Response Status: " + response.Status)!
-    fmt::Print("Response Body: " + string(body))!
+    print("Response Status: " + response.Status)!
+    print("Response Body: " + string(body))!
 ] catch err [
-    fmt::Print("Error: " + err.Error())!
+    print("Error: " + err.Error())!
 ]
