@@ -1,4 +1,5 @@
 import { createSignal, onMount, onCleanup } from 'solid-js';
+import { Split } from 'solid-split-component';
 import { ErrorBoundary } from 'solid-js';
 import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
@@ -8,70 +9,150 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { StreamLanguage } from '@codemirror/language';
 import { LanguageSupport } from '@codemirror/language';
 import { styleTags, tags as t } from '@lezer/highlight';
+const editorStyles = /*css*/ `
+  .editor-container {
+    background: linear-gradient(135deg, #1a1b26 0%, #24283b 100%);
+    min-height: 100vh;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .blaze-logo {
+    background: linear-gradient(90deg, #ff9e64 0%, #f7768e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  
+  .panel {
+    background: rgba(26, 27, 38, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .gutter {
+    background: rgba(255, 255, 255, 0.1);
+    cursor: col-resize;
+  }
+  
+  .gutter:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .terminal {
+    background: linear-gradient(180deg, #1a1b26 0%, #1f2335 100%);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  .toolbar {
+    background: linear-gradient(90deg, rgba(26, 27, 38, 0.9) 0%, rgba(36, 40, 59, 0.9) 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
 
+  .tab-active {
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom: 2px solid #ff9e64;
+  }
+`;
 // goofball lang spec
 const blazeLanguage = StreamLanguage.define({
   name: "blaze",
-  
+
   startState() {
     return {
       inString: false,
       inComment: false,
-      bracketDepth: 0
+      bracketDepth: 0,
+      inImport: false
     };
   },
 
   token(stream, state) {
-    // nested brackets
-    if (stream.peek() === '[') {
-      state.bracketDepth++;
-    } else if (stream.peek() === ']') {
-      state.bracketDepth--;
-    }
+    if (stream.eatSpace()) return null;
 
-    // Comments
     if (!state.inString && stream.match("//")) {
       stream.skipToEnd();
       return "comment";
     }
 
-    // strings
     if (!state.inString && stream.match('"')) {
       state.inString = true;
       return "string";
     }
     if (state.inString) {
-      if (stream.match(/\\./)) return "string-2";
-      if (stream.match('"')) {
-        state.inString = false;
-        return "string";
+      let ch = stream.next();
+      if (ch === '\\') {
+        stream.next();
+        return "string-2"; // escaped characters
       }
-      stream.next();
+      if (ch === '"') {
+        state.inString = false;
+      }
       return "string";
     }
 
-    // Keywords
-    if (stream.match(/\b(import|try|catch|if|println)\b/)) {
+    // blocks
+    if (stream.peek() === '[' || stream.peek() === '{') {
+      state.bracketDepth++;
+      stream.next();
+      return "bracket";
+    }
+    if (stream.peek() === ']' || stream.peek() === '}') {
+      state.bracketDepth--;
+      stream.next();
+      return "bracket";
+    }
+
+    //line endings (! and ?)
+    if (stream.match(/[!?]$/)) {
+      return "meta";
+    }
+
+    if (stream.match(/\b(try|catch|let|if|else|func|return)\b/)) {
       return "keyword";
     }
 
-    // popular pkgs
-    if (stream.match(/\b(net\/http|io)\b/)) {
-      return "variable-2";
+    if (stream.match(/\b(print|println|printf)\b(?=\()/)) {
+      return "builtin";
     }
 
-    // Functions
-    if (stream.match(/\b\w+(?=::)/)) {
-      return "function";
-    }
-
-    // operators
-    if (stream.match(/(<-|::)|[<>]=?|[!=]=?=?|&&|\|\||[\+\-\*\/]=?/)) {
+    // <- (assignment) and :: (method access)
+    if (stream.match(/(<-|::)|[<>]=?|[!=]=?|&&|\|\||[\+\-\*\/]=?/)) {
       return "operator";
     }
 
-    // Punctuation
-    if (stream.match(/[[\](){}!,;]/)) {
+    if (stream.match(/\bimport\b/)) {
+      state.inImport = true;
+      return "keyword";
+    }
+
+    if (state.inImport && stream.match(/[\w\/]+(?=[!\s])/)) {
+      state.inImport = false;
+      return "string";
+    }
+
+    if (stream.match(/\b\w+(?=::)/)) {
+      return "variable-2";
+    }
+    if (stream.match(/\b\w+(?=\()/)) {
+      return "function";
+    }
+
+    if (stream.match(/\b[a-zA-Z_]\w*(?=\s*<-)/)) {
+      return "def";
+    }
+
+    if (stream.match(/\b\d+\.?\d*\b/)) {
+      return "number";
+    }
+
+    if (stream.match(/\b[a-zA-Z_]\w*\b/)) {
+      return "variable";
+    }
+
+    if (stream.match(/[(),;]/)) {
       return "punctuation";
     }
 
@@ -93,13 +174,21 @@ const blazeTheme = EditorView.theme({
   ".cm-line": {
     padding: "0 8px"
   },
+  //  cooolors
   ".cm-comment": { color: "#6a9955" },
   ".cm-string": { color: "#ce9178" },
+  ".cm-string-2": { color: "#d7ba7d" },
   ".cm-keyword": { color: "#569cd6" },
+  ".cm-builtin": { color: "#dcdcaa" },
   ".cm-function": { color: "#dcdcaa" },
+  ".cm-variable": { color: "#9cdcfe" },
   ".cm-variable-2": { color: "#4ec9b0" },
+  ".cm-def": { color: "#4fc1ff" },
+  ".cm-number": { color: "#b5cea8" },
   ".cm-operator": { color: "#d4d4d4" },
-  ".cm-punctuation": { color: "#d4d4d4" }
+  ".cm-punctuation": { color: "#d4d4d4" },
+  ".cm-bracket": { color: "#ffd700" },
+  ".cm-meta": { color: "#d4d4d4" }
 });
 
 function BlazeCodeEditorContent() {
@@ -179,126 +268,104 @@ if x == 1 [
       setOutput(`Transpilation error: ${err.message}`);
     }
   };
-
   return (
-    <div class="min-h-screen bg-ctp-base text-ctp-text p-8 font-ubuntu">
-      <div class="max-w-4xl mx-auto">
-        <h1 class="text-6xl font-bold text-center mb-8 text-ctp-peach drop-shadow-lg">
-          Blaze 🔥
-        </h1>
+    <div class="editor-container">
+      <style>{editorStyles}</style>
 
-        <div class="bg-ctp-mantle shadow-xl rounded-lg overflow-hidden">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-            {/* Code Editor */}
-            <div class="bg-ctp-surface0 rounded-lg p-4">
-              <div class="flex items-center mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-6 w-6 mr-2 text-ctp-blue"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                  />
-                </svg>
-                <h2 class="text-xl font-semibold text-ctp-text">Code Editor</h2>
+      {/* Top Bar */}
+      <div class="toolbar h-12 flex items-center px-4 justify-between">
+        <div class="flex items-center gap-4">
+          <h1 class="blaze-logo text-2xl font-bold flex items-center gap-2">
+            Blaze <span class="text-xl">🔥</span>
+          </h1>
+          <div class="flex gap-4 ml-8">
+            <button class="text-sm text-gray-400 hover:text-white">File</button>
+            <button class="text-sm text-gray-400 hover:text-white">Edit</button>
+            <button class="text-sm text-gray-400 hover:text-white">View</button>
+            <button class="text-sm text-gray-400 hover:text-white">Help</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-400">Smartlinuxcoder</span>
+          <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white">
+            S
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div class="flex-1 flex">
+        {/* Sidebar */}
+        <div class="w-12 bg-[#1a1b26] border-r border-[rgba(255,255,255,0.1)] flex flex-col items-center py-4 gap-4">
+          <button class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+          </button>
+          <button class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Editor and Terminal */}
+        <div class="flex-1">
+          <Split
+            class="h-full"
+            spacing={1}
+            gutterSize={4}
+            direction="vertical"
+            sizes={[70, 30]}
+          >
+            {/* Editor Panel */}
+            <div class="h-full flex flex-col">
+              <div class="toolbar px-4 py-2 flex items-center gap-4">
+                <div class="flex items-center gap-2 px-3 py-1 rounded tab-active">
+                  <span class="w-2 h-2 rounded-full bg-orange-400"></span>
+                  <span class="text-sm text-gray-200">main.blz</span>
+                </div>
               </div>
-              <div ref={editorRef} class="border rounded-lg overflow-hidden" />
+              <div ref={editorRef} class="flex-1 overflow-hidden" />
             </div>
 
-            {/* Terminal/Output */}
-            <div class="bg-ctp-surface0 rounded-lg p-4">
-              <div class="flex items-center mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-6 w-6 mr-2 text-ctp-green"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-                  />
-                </svg>
-                <h2 class="text-xl font-semibold text-ctp-text">Output</h2>
+            {/* Terminal Panel */}
+            <div class="h-full flex flex-col">
+              <div class="toolbar px-4 py-2 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <button class="px-3 py-1 text-sm text-gray-200 tab-active rounded-t">Terminal</button>
+                  <button class="px-3 py-1 text-sm text-gray-400 hover:text-white">Problems</button>
+                  <button class="px-3 py-1 text-sm text-gray-400 hover:text-white">Output</button>
+                </div>
+                <div class="flex items-center gap-4">
+                  <button class="text-sm px-4 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white transition"
+                    onClick={handleCompile}>
+                    Compile & Run
+                  </button>
+                  <button class="text-sm px-4 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition"
+                    onClick={handleTranspile}>
+                    Transpile
+                  </button>
+                </div>
               </div>
-              <pre class="w-full h-[500px] overflow-auto bg-ctp-base text-ctp-green p-4 rounded font-mono text-sm">
+              <pre class="terminal flex-1 p-4 overflow-auto text-sm font-mono">
                 {output()}
               </pre>
             </div>
-          </div>
+          </Split>
+        </div>
+      </div>
 
-          {/* Action Buttons */}
-          <div class="bg-ctp-surface1 p-4 flex justify-center space-x-4">
-            <button
-              onClick={handleCompile}
-              class="flex items-center bg-ctp-blue text-ctp-base px-4 py-2 rounded hover:opacity-90 transition"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              Compile
-            </button>
-            <button
-              onClick={handleRun}
-              class="flex items-center bg-ctp-green text-ctp-base px-4 py-2 rounded hover:opacity-90 transition"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                />
-              </svg>
-              Run
-            </button>
-            <button
-              onClick={handleTranspile}
-              class="flex items-center bg-ctp-yellow text-ctp-base px-4 py-2 rounded hover:opacity-90 transition"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12h6m2 0a8 8 0 10-16 0 8 8 0 0016 0z"
-                />
-              </svg>
-              Transpile
-            </button>
-          </div>
+      {/* Status Bar */}
+      <div class="toolbar h-6 flex items-center px-4 justify-between text-xs text-gray-400">
+        <div class="flex items-center gap-4">
+          <span>UTF-8</span>
+          <span>Blaze</span>
+          <span>Ln 1, Col 1</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span>{new Date().toLocaleTimeString()}</span>
+          <span>v1.0.0</span>
         </div>
       </div>
     </div>

@@ -21,7 +21,7 @@ func randomString(length int) (string, error) {
 	return hex.EncodeToString(bytes)[:length], nil
 }
 func main() {
-	fileName := "main.blaze"
+	fileName := "main.blz"
 
 	// Check for command-line arguments
 	if len(os.Args) > 1 {

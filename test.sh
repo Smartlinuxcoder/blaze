@@ -19,22 +19,22 @@ check_status $?
 
 mkdir -p ./computed
 mv ./main ./computed/compiler
-cp *.blaze ./computed/
+cp *.blz ./computed/
 
 cd computed || exit 1
 
 rm -rf ./john
 
 echo "Transpiling..."
-./compiler transpile john.blaze
+./compiler transpile john.blz
 check_status $?
 
 echo "Compiling..."
-./compiler build john.blaze
+./compiler build john.blz
 check_status $?
 
 echo "Running v1..."
-./compiler run john.blaze
+./compiler run john.blz
 check_status $?
 
 echo "Running v2..."
