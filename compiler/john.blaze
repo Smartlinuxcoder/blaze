@@ -7,13 +7,13 @@ try [
     // this is a commment, this gets sent to the transpiled version too
     response <- http::Get(url)!
     body <- io::ReadAll(response.Body)!
-    print("Response Status: " + response.Status)!
-    print("Response Body: " + string(body))!
+    println("Response Status: " + response.Status)!
+    println("Response Body: " + string(body))!
 ] catch err [
-    print("Error: " + err.Error())!
+    println("Error: " + err.Error())!
 ]
 
-let x = 1!
+x <- 1!
 if x == 1 [
     println("hi")!
 ]

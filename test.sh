@@ -12,7 +12,7 @@ check_status() {
         exit $1
     fi
 }
-
+cd compiler
 echo "Building compiler..."
 go build main.go transpiler.go
 check_status $?
