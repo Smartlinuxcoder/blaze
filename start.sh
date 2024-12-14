@@ -10,7 +10,9 @@ cd ..
 echo "Copying compiler to website"
 mv compiler/blaze ./website/blaze
 
-echo "Starting server"
+echo "installing dependencies"
 cd website
+bun install
+echo "Starting server"
 
 bun run dev
