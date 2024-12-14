@@ -9,6 +9,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { StreamLanguage } from '@codemirror/language';
 import { LanguageSupport } from '@codemirror/language';
 import { styleTags, tags as t } from '@lezer/highlight';
+
 const editorStyles = /*css*/ `
   .editor-container {
     background: linear-gradient(135deg, #1a1b26 0%, #24283b 100%);
@@ -194,8 +195,10 @@ const blazeTheme = EditorView.theme({
 function BlazeCodeEditorContent() {
   let editorRef;
   let editorView;
+  let fileInputRef;
 
   const [output, setOutput] = createSignal('');
+  const [fileName, setFileName] = createSignal('main.blz');
 
   const initialCode = `import net/http!
 import io!
@@ -239,38 +242,131 @@ if x == 1 [
     });
   });
 
-  const handleCompile = () => {
-    try {
-      const code = editorView?.state.doc.toString();
-      if (!code) return;
-      setOutput('Compilation successful!');
-    } catch (err) {
-      setOutput(`Compilation error: ${err.message}`);
+  const handleFileImport = async (event) => {
+    const target = event.target;
+    const file = target.files?.[0];
+
+    if (file) {
+      setFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result;
+        editorView.dispatch({
+          changes: {
+            from: 0,
+            to: editorView.state.doc.length,
+            insert: content
+          }
+        });
+      };
+      reader.readAsText(file);
     }
   };
 
-  const handleRun = () => {
+  const handleCompileAndRun = async () => {
+    const code = editorView?.state.doc.toString();
+    if (!code) return;
+
     try {
-      const code = editorView?.state.doc.toString();
-      if (!code) return;
-      setOutput('Running code');
+      const response = await fetch('/api/blaze/compile-run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ code })
+      });
+
+      const result = await response.json();
+      setOutput(result.output || 'Compilation and run successful');
     } catch (err) {
-      setOutput(`Runtime error: ${err.message}`);
+      setOutput(`Error: ${err.message}`);
     }
   };
 
-  const handleTranspile = () => {
+  const handleTranspile = async () => {
+    const code = editorView?.state.doc.toString();
+    if (!code) return;
+  
     try {
-      const code = editorView?.state.doc.toString();
-      if (!code) return;
-      setOutput('Transpilating');
+      setOutput('Transpiling...');
+      const response = await fetch('/transpile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file: fileName(),
+          content: code
+        })
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Build failed: ${response.statusText}`);
+      }
+  
+      const result = await response.json();
+      console.log(result);
+      const blob = new Blob([new Uint8Array(result.content.data)], { type: result.type });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName().split('.').slice(0, -1).join('.')+".go";
+      link.click();
+      setOutput(output() + `
+      Done!`);
+      // Clean up the object URL
+      URL.revokeObjectURL(link.href);
     } catch (err) {
-      setOutput(`Transpilation error: ${err.message}`);
+      setOutput(`Build error: ${err.message}`);
+    }
+  };
+
+  const handleBuild = async () => {
+    const code = editorView?.state.doc.toString();
+    if (!code) return;
+    setOutput('Compiling...');
+    try {
+      const response = await fetch('/build', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file: fileName(),
+          content: code
+        })
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Build failed: ${response.statusText}`);
+      }
+      setOutput(output() + `
+      Done!`);
+      const result = await response.json();
+      console.log(result);
+      const blob = new Blob([new Uint8Array(result.content.data)], { type: result.type });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName().split('.').slice(0, -1).join('.');
+      link.click();
+      
+      // Clean up the object URL
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      setOutput(`Build error: ${err.message}`);
     }
   };
   return (
     <div class="editor-container">
       <style>{editorStyles}</style>
+
+      {/* Input for file import (hidden) */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".blz"
+        style="display: none"
+        onChange={handleFileImport}
+      />
 
       {/* Top Bar */}
       <div class="toolbar h-12 flex items-center px-4 justify-between">
@@ -283,6 +379,17 @@ if x == 1 [
             <button class="text-sm text-gray-400 hover:text-white">Edit</button>
             <button class="text-sm text-gray-400 hover:text-white">View</button>
             <button class="text-sm text-gray-400 hover:text-white">Help</button>
+          </div>
+          <div class="flex items-center gap-2 ml-8">
+            <button
+              onClick={() => fileInputRef.click()}
+              class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]"
+              title="Import .blz File"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+            </button>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -297,7 +404,11 @@ if x == 1 [
       <div class="flex-1 flex">
         {/* Sidebar */}
         <div class="w-12 bg-[#1a1b26] border-r border-[rgba(255,255,255,0.1)] flex flex-col items-center py-4 gap-4">
-          <button class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]">
+          <button
+            class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]"
+            onClick={() => fileInputRef.click()}
+            title="Import File"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
             </svg>
@@ -323,7 +434,7 @@ if x == 1 [
               <div class="toolbar px-4 py-2 flex items-center gap-4">
                 <div class="flex items-center gap-2 px-3 py-1 rounded tab-active">
                   <span class="w-2 h-2 rounded-full bg-orange-400"></span>
-                  <span class="text-sm text-gray-200">main.blz</span>
+                  <span class="text-sm text-gray-200">{fileName()}</span>
                 </div>
               </div>
               <div ref={editorRef} class="flex-1 overflow-hidden" />
@@ -338,17 +449,27 @@ if x == 1 [
                   <button class="px-3 py-1 text-sm text-gray-400 hover:text-white">Output</button>
                 </div>
                 <div class="flex items-center gap-4">
-                  <button class="text-sm px-4 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white transition"
-                    onClick={handleCompile}>
+                  <button
+                    class="text-sm px-4 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white transition"
+                    onClick={handleCompileAndRun}
+                  >
                     Compile & Run
                   </button>
-                  <button class="text-sm px-4 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition"
-                    onClick={handleTranspile}>
+                  <button
+                    class="text-sm px-4 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition"
+                    onClick={handleTranspile}
+                  >
                     Transpile
+                  </button>
+                  <button
+                    class="text-sm px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-white transition"
+                    onClick={handleBuild}
+                  >
+                    Build
                   </button>
                 </div>
               </div>
-              <pre class="terminal flex-1 p-4 overflow-auto text-sm font-mono">
+              <pre class="terminal flex-1 p-4 overflow-auto text-sm font-mono text-gray-400">
                 {output()}
               </pre>
             </div>
