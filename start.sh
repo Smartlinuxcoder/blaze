@@ -12,7 +12,7 @@ mv compiler/blaze ./website/blaze
 
 echo "installing dependencies"
 cd website
-bun install
+deno install
 echo "Starting server"
 
-bun run dev
+deno run dev
