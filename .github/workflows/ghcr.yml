@@ -1,7 +1,6 @@
 name: Deploy Images to GHCR
 
-env:
-  DOTNET_VERSION: '6.0.x'
+
 
 on:
   push:
@@ -24,7 +23,7 @@ jobs:
             with:
               registry: ghcr.io
               username: Smartlinuxcoder
-              password: ${{secrets.GOOFBALL_TOKEN}}
+              password: ${{secrets.GOOFBALL_TOKEN-GITHUB_SECRET}}
 
           - name: 'Build Inventory Image'
             run: |
