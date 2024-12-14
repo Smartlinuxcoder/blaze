@@ -13,7 +13,6 @@ permissions:
 jobs:
   push-store-image:
     runs-on: ubuntu-latest
-    environment: Actions  # Added to match your environment secret configuration
     defaults:
       run:
         working-directory: './'
@@ -36,6 +35,4 @@ jobs:
       - name: 'Deploy to Coolify'
         run: |
           curl -X POST "https://coolify.smart.is-a.dev/api/v1/deploy?uuid=rogo0448wkgowws48c8gko8o&force=false" \
-          -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}"
-        env:
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          -H "BearerAuth: Bearer ${{ secrets.COOLIFY_TOKEN }}"
