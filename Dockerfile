@@ -6,7 +6,7 @@ WORKDIR /app/compiler
 RUN go build -o blaze
 
 # Stage 2: Build SolidJS app thingy
-FROM oven/bun AS website-builder
+FROM oven/bun:alpine AS website-builder
 WORKDIR /app
 COPY website/ ./
 COPY --from=compiler-builder /app/compiler/blaze ./blaze
@@ -14,8 +14,7 @@ RUN bun install
 RUN bun run build
 
 # Stage 3: Final stage
-FROM oven/bun
-RUN apt-get update && apt-get install -y golang-go
+FROM oven/bun:alpine
 WORKDIR /app
 COPY --from=website-builder /app/.output ./.output
 COPY --from=website-builder /app/blaze ./blaze

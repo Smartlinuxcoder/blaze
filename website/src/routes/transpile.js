@@ -13,8 +13,8 @@ export async function POST({ request }) {
 
         const sanitizedBaseName = path.basename(file).split('.').slice(0, -1).join('.');
         const randomName = randomBytes(4).toString('hex');
-        const filename = path.join('/app/uploads', `${sanitizedBaseName}${randomName}.blz`);
-        const binaryPath = path.join('/app/uploads', `${sanitizedBaseName}${randomName}.go`);
+        const filename = path.join('uploads', `${sanitizedBaseName}${randomName}.blz`);
+        const binaryPath = path.join('uploads', `${sanitizedBaseName}${randomName}.go`);
 
         console.log("writing");
         await writeFile(filename, content, { signal: AbortSignal.timeout(5000) });
