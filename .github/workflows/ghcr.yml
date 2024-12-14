@@ -24,7 +24,7 @@ jobs:
             with:
               registry: ghcr.io
               username: Smartlinuxcoder
-              password: ${{secrets.GITHUB_TOKEN}}
+              password: ${{secrets.GOOFBALL_TOKEN}}
 
           - name: 'Build Inventory Image'
             run: |
