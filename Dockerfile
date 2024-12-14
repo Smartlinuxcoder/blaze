@@ -15,6 +15,7 @@ RUN bun run build
 
 # Stage 3: Final stage
 FROM oven/bun
+RUN apt-get update && apt-get install -y golang-go
 WORKDIR /app
 COPY --from=website-builder /app/.output ./.output
 COPY --from=website-builder /app/blaze ./blaze
