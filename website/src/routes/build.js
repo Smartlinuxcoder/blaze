@@ -9,6 +9,7 @@ const execAsync = promisify(exec);
 
 export async function POST({ request }) {
     try {
+        console.log("gyattermaxxer, hello!");
         const { file, content } = await request.json();
 
         const sanitizedBaseName = path.basename(file).split('.').slice(0, -1).join('.');
@@ -26,10 +27,10 @@ export async function POST({ request }) {
         const fileContent = await readFile(binaryPath);
 
         console.log("removing");
-        await Promise.all([
+         await Promise.all([
             unlink(filename).catch(console.error),
             unlink(binaryPath).catch(console.error)
-        ]);
+        ]); 
 
         console.log("done");
         return json({
