@@ -266,27 +266,49 @@ if x == 1 [
   const handleCompileAndRun = async () => {
     const code = editorView?.state.doc.toString();
     if (!code) return;
-
+    setOutput('Compiling...');
     try {
-      const response = await fetch('/api/blaze/compile-run', {
+      const response = await fetch('/run', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code })
+        body: JSON.stringify({
+          file: fileName(),
+          content: code
+        })
       });
 
-      const result = await response.json();
-      setOutput(result.output || 'Compilation and run successful');
+      if (!response.ok) {
+        throw new Error(`Build failed: ${response.statusText}`);
+      }
+
+      setOutput(`Running...
+        `);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+
+      const processStream = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          setOutput((prevOutput) => prevOutput + decoder.decode(value, { stream: true }));
+        }
+        setOutput((prevOutput) => prevOutput + '\nDone!');
+      };
+
+      await processStream();
+
     } catch (err) {
-      setOutput(`Error: ${err.message}`);
+      setOutput(`Build error: ${err.message}`);
     }
   };
 
   const handleTranspile = async () => {
     const code = editorView?.state.doc.toString();
     if (!code) return;
-  
+
     try {
       setOutput('Transpiling...');
       const response = await fetch('/transpile', {
@@ -299,17 +321,17 @@ if x == 1 [
           content: code
         })
       });
-  
+
       if (!response.ok) {
         throw new Error(`Build failed: ${response.statusText}`);
       }
-  
+
       const result = await response.json();
       console.log(result);
       const blob = new Blob([new Uint8Array(result.content.data)], { type: result.type });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = fileName().split('.').slice(0, -1).join('.')+".go";
+      link.download = fileName().split('.').slice(0, -1).join('.') + ".go";
       link.click();
       setOutput(output() + `
       Done!`);
@@ -335,7 +357,7 @@ if x == 1 [
           content: code
         })
       });
-  
+
       if (!response.ok) {
         throw new Error(`Build failed: ${response.statusText}`);
       }
@@ -348,7 +370,7 @@ if x == 1 [
       link.href = URL.createObjectURL(blob);
       link.download = fileName().split('.').slice(0, -1).join('.');
       link.click();
-      
+
       // Clean up the object URL
       URL.revokeObjectURL(link.href);
     } catch (err) {
