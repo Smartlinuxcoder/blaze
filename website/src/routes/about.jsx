@@ -139,7 +139,8 @@ try [
       {/* Navigation Sidebar */}
       <nav class="fixed w-64 h-full bg-[#181825] border-r border-[#313244] overflow-y-auto">
         <div class="p-6">
-          <h1 class="text-2xl font-bold text-[#f5e0dc] mb-6">Blaze Book</h1>
+          <h1 class="text-2xl font-bold text-[#f5e0dc]">Blaze Book</h1>
+          <a class="text-[#f5e0dc] mb-8 pb-4 text-xl" href="/">Go back to the IDE</a>
           <ul class="space-y-4">
             <li>
               <a href="#introduction" class="text-[#89b4fa] hover:text-[#74c7ec]">

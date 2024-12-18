@@ -72,6 +72,7 @@ if x == 1 [
       state: startState,
       parent: editorRef
     });
+    setOutput('Wondering what is this? check the docs out at <a href="https://blaze.smart.is-a.dev/about" target="_blank">https://blaze.smart.is-a.dev/about</a>');
 
     onCleanup(() => {
       if (editorView) {
@@ -289,7 +290,7 @@ if x == 1 [
               class="text-sm text-gray-400 hover:text-white"
               onClick={() => navigate('/about')}
             >
-              Help
+              What's this?
             </button>
           </div>
 
@@ -414,7 +415,7 @@ if x == 1 [
                 </div>
               </div>
               <pre class="terminal flex-1 p-4 overflow-auto text-sm font-mono text-gray-400">
-                {output()}
+                <div innerHTML={output()} />
               </pre>
             </div>
           </Split>
