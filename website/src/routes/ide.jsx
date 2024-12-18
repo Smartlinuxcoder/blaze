@@ -288,9 +288,9 @@ if x == 1 [
             </div>
             <button
               class="text-sm text-gray-400 hover:text-white"
-              onClick={() => navigate('/about')}
+              onClick={() => navigate('/')}
             >
-              What's this?
+              Help
             </button>
           </div>
 
