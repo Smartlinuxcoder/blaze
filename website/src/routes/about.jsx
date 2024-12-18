@@ -181,12 +181,14 @@ try [
       <main class="ml-64 p-8">
         <div class="max-w-4xl mx-auto">
           <section id="introduction" class="mb-12">
-            <h1 class="text-4xl font-bold text-[#f5e0dc] mb-8">
+            <h1 class="text-4xl font-bold text-[#f5e0dc]">
               Introduction to Blaze 🔥
             </h1>
+            <p class="text-[#cdd6f4] mb-6 text-2xl">
+              Blazingly fast.
+            </p>
             <p class="text-[#cdd6f4] mb-6">
-              Blaze is a modern programming language that combines simplicity with power.
-              Let's start with a simple example:
+              Blaze is a modern programming language that is supposed to be powerful and fast but without sacrificing readability.
             </p>
             <InteractiveCode 
               code={simpleExample}
@@ -230,6 +232,9 @@ try [
               code={httpExample}
               explanation="Make an HTTP request to GitHub's API"
             />
+            <p class="text-[#cdd6f4] mb-4">
+              You can use every library from Golang's standard library with no configuration needed.
+            </p>
           </section>
         </div>
       </main>
