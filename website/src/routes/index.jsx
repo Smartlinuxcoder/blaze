@@ -21,6 +21,7 @@ function BlazeCodeEditorContent() {
 
   const [output, setOutput] = createSignal('');
   const [fileName, setFileName] = createSignal('main.blz');
+  const [cursorPos, setCursorPos] = createSignal({ line: 1, col: 1 });
 
   const initialCode = `import net/http!
 import io!
@@ -49,6 +50,14 @@ if x == 1 [
         blazeTheme,
         oneDark,
         EditorView.lineWrapping,
+        EditorView.updateListener.of((update) => {
+          const main = update.state.selection.main;
+          const line = update.state.doc.lineAt(main.head);
+          setCursorPos({
+            line: line.number,
+            col: main.head - line.from + 1
+          });
+        }),
       ],
     });
 
@@ -237,9 +246,9 @@ if x == 1 [
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-400">Smartlinuxcoder</span>
+          <span class="text-sm text-gray-400">User</span>
           <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white">
-            S
+            U
           </div>
         </div>
       </div>
@@ -326,7 +335,7 @@ if x == 1 [
         <div class="flex items-center gap-4">
           <span>UTF-8</span>
           <span>Blaze</span>
-          <span>Ln 1, Col 1</span>
+          <span>Ln {cursorPos().line}, Col {cursorPos().col}</span>
         </div>
         <div class="flex items-center gap-4">
           <span>{new Date().toLocaleTimeString()}</span>
