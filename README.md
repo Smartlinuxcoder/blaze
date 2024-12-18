@@ -6,8 +6,8 @@
 Blaze is a modern programming language that transpiles to Go or can compile to machine code.
 
 
-Website at [https://blaze.smart.is-a.dev](https://blaze.smart.is-a.dev)
-Web IDE at [https://blaze.smart.is-a.dev/ide](https://blaze.smart.is-a.dev/ide)
+- Website at [https://blaze.smart.is-a.dev](https://blaze.smart.is-a.dev)
+- Web IDE at [https://blaze.smart.is-a.dev/ide](https://blaze.smart.is-a.dev/ide)
 
 
 
