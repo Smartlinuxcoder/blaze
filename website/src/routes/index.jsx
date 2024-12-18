@@ -1,55 +1,21 @@
-import { createSignal, onMount, onCleanup } from 'solid-js';
+import { createSignal } from 'solid-js';
 import { Split } from 'solid-split-component';
-import { ErrorBoundary } from 'solid-js';
 import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { StreamLanguage } from '@codemirror/language';
+import { blazeLanguage, blazeTheme } from '~/components/editor';
 import { LanguageSupport } from '@codemirror/language';
-import { styleTags, tags as t } from '@lezer/highlight';
-import { editorStyles, blazeLanguage, blazeTheme } from '~/components/editor';
-import { useNavigate } from '@solidjs/router';
-
-
-
-
-function BlazeCodeEditorContent() {
+import { onMount, onCleanup } from 'solid-js';
+function InteractiveCode(props) {
   let editorRef;
   let editorView;
-  let fileInputRef;
-
   const [output, setOutput] = createSignal('');
-  const [fileName, setFileName] = createSignal('main.blz');
-  const [cursorPos, setCursorPos] = createSignal({ line: 1, col: 1 });
-  const navigate = useNavigate();
-  const [showFileMenu, setShowFileMenu] = createSignal(false);
-  const [showSettings, setShowSettings] = createSignal(false);
-
-
-
-
-  const initialCode = `import net/http!
-import io!
-url <- "http://letsgosky.social"!
-try [
-    // this is a comment, this gets sent to the transpiled version too
-    response <- http::Get(url)!
-    body <- io::ReadAll(response.Body)!
-    println("Response Status: " + response.Status)!
-    println("Response Body: " + string(body))!
-] catch err [
-    println("Error: " + err.Error())!
-]
-x <- 1!
-if x == 1 [
-    println("hi")!
-]`;
 
   onMount(() => {
     const startState = EditorState.create({
-      doc: initialCode,
+      doc: props.code,
       extensions: [
         basicSetup,
         keymap.of([indentWithTab]),
@@ -57,14 +23,6 @@ if x == 1 [
         blazeTheme,
         oneDark,
         EditorView.lineWrapping,
-        EditorView.updateListener.of((update) => {
-          const main = update.state.selection.main;
-          const line = update.state.doc.lineAt(main.head);
-          setCursorPos({
-            line: line.number,
-            col: main.head - line.from + 1
-          });
-        }),
       ],
     });
 
@@ -72,7 +30,6 @@ if x == 1 [
       state: startState,
       parent: editorRef
     });
-    setOutput('Wondering what is this? check the docs out at <a href="https://blaze.smart.is-a.dev/about" target="_blank">https://blaze.smart.is-a.dev/about</a>');
 
     onCleanup(() => {
       if (editorView) {
@@ -80,50 +37,12 @@ if x == 1 [
       }
     });
   });
-  const handleNewFile = () => {
-    editorView.dispatch({
-      changes: {
-        from: 0,
-        to: editorView.state.doc.length,
-        insert: ''
-      }
-    });
-    setFileName('untitled.blz');
-    setShowFileMenu(false);
-  };
 
-  const handleRename = () => {
-    const newName = prompt('Enter new file name:', fileName());
-    if (newName) {
-      setFileName(newName);
-    }
-    setShowFileMenu(false);
-  };
-  const handleFileImport = async (event) => {
-    const target = event.target;
-    const file = target.files?.[0];
-
-    if (file) {
-      setFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result;
-        editorView.dispatch({
-          changes: {
-            from: 0,
-            to: editorView.state.doc.length,
-            insert: content
-          }
-        });
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  const handleCompileAndRun = async () => {
+  const handleRun = async () => {
     const code = editorView?.state.doc.toString();
     if (!code) return;
-    setOutput('Compiling...');
+
+    setOutput('Running...');
     try {
       const response = await fetch('/run', {
         method: 'POST',
@@ -131,318 +50,249 @@ if x == 1 [
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          file: fileName(),
+          file: 'example.blz',
           content: code
         })
       });
 
       if (!response.ok) {
-        throw new Error(`Build failed: ${response.statusText}`);
+        throw new Error(`Run failed: ${response.statusText}`);
       }
-
-      setOutput(`Running...
-        `);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
+      let result = '';
 
-      const processStream = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          setOutput((prevOutput) => prevOutput + decoder.decode(value, { stream: true }));
-        }
-        setOutput((prevOutput) => prevOutput + '\nDone!');
-      };
-
-      await processStream();
-
-    } catch (err) {
-      setOutput(`Build error: ${err.message}`);
-    }
-  };
-
-  const handleTranspile = async () => {
-    const code = editorView?.state.doc.toString();
-    if (!code) return;
-
-    try {
-      setOutput('Transpiling...');
-      const response = await fetch('/transpile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          file: fileName(),
-          content: code
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Build failed: ${response.statusText}`);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        result += decoder.decode(value, { stream: true });
       }
 
-      const result = await response.json();
-      console.log(result);
-      const blob = new Blob([new Uint8Array(result.content.data)], { type: result.type });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = fileName().split('.').slice(0, -1).join('.') + ".go";
-      link.click();
-      setOutput(output() + `
-      Done!`);
-      // Clean up the object URL
-      URL.revokeObjectURL(link.href);
+      setOutput(result);
     } catch (err) {
-      setOutput(`Build error: ${err.message}`);
+      setOutput(`Error: ${err.message}`);
     }
   };
 
-  const handleBuild = async () => {
-    const code = editorView?.state.doc.toString();
-    if (!code) return;
-    setOutput('Compiling...');
-    try {
-      const response = await fetch('/build', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          file: fileName(),
-          content: code
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Build failed: ${response.statusText}`);
-      }
-      setOutput(output() + `
-      Done!`);
-      const result = await response.json();
-      console.log(result);
-      const blob = new Blob([new Uint8Array(result.content.data)], { type: result.type });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = fileName().split('.').slice(0, -1).join('.');
-      link.click();
-
-      // Clean up the object URL
-      URL.revokeObjectURL(link.href);
-    } catch (err) {
-      setOutput(`Build error: ${err.message}`);
-    }
-  };
   return (
-    <div class="editor-container">
-      <style>{editorStyles}</style>
-
-      {/* Input for file import (hidden) */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept=".blz"
-        style="display: none"
-        onChange={handleFileImport}
-      />
-
-      {/* Top Bar */}
-      <div class="toolbar h-12 flex items-center px-4 justify-between">
-        <div class="flex items-center gap-4">
-          <h1 class="blaze-logo text-2xl font-bold flex items-center gap-2">
-            Blaze <span class="text-xl">🔥</span>
-          </h1>
-          <div class="flex gap-4 ml-8">
-            <div class="relative">
-              <button
-                class="text-sm text-gray-400 hover:text-white"
-                onClick={() => setShowFileMenu(!showFileMenu())}
-              >
-                File
-              </button>
-
-              {/* File Menu Dropdown */}
-              {showFileMenu() && (
-                <div class="absolute top-full left-0 mt-1 w-48 bg-[#1a1b26] rounded-md shadow-lg border border-[rgba(255,255,255,0.1)] py-1 z-50">
-                  <button
-                    class="w-full px-4 py-2 text-sm text-gray-300 hover:bg-[rgba(255,255,255,0.1)] text-left"
-                    onClick={handleNewFile}
-                  >
-                    New File
-                  </button>
-                  <button
-                    class="w-full px-4 py-2 text-sm text-gray-300 hover:bg-[rgba(255,255,255,0.1)] text-left"
-                    onClick={() => fileInputRef.click()}
-                  >
-                    Open File...
-                  </button>
-                  <button
-                    class="w-full px-4 py-2 text-sm text-gray-300 hover:bg-[rgba(255,255,255,0.1)] text-left"
-                    onClick={handleRename}
-                  >
-                    Rename...
-                  </button>
-                </div>
-              )}
-            </div>
-            <button
-              class="text-sm text-gray-400 hover:text-white"
-              onClick={() => navigate('/about')}
-            >
-              What's this?
-            </button>
-          </div>
-
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-400">User</span>
-          <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white">
-            U
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div class="flex-1 flex">
-        {/* Sidebar */}
-        <div class="w-12 bg-[#1a1b26] border-r border-[rgba(255,255,255,0.1)] flex flex-col items-center py-4 gap-4">
+    <div class="my-4 border border-[#313244] rounded-lg overflow-hidden">
+      <div class="bg-[#181825] p-4">
+        <div ref={editorRef} class="mb-4" />
+        <div class="flex justify-between items-center">
           <button
-            class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]"
-            onClick={() => fileInputRef.click()}
-            title="Import File"
+            onClick={handleRun}
+            class="px-4 py-2 bg-[#89b4fa] text-[#1e1e2e] rounded hover:bg-[#74c7ec] transition"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
+            Run
           </button>
-          {/* <button
-            class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]"
-            onClick={() => setShowSettings(!showSettings())}
-            title="Settings"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-            </svg>
-          </button> */}
-
-        </div>
-
-        {showSettings() && (
-          <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-[#1a1b26] w-96 rounded-lg shadow-lg border border-[rgba(255,255,255,0.1)]">
-              <div class="flex justify-between items-center px-4 py-3 border-b border-[rgba(255,255,255,0.1)]">
-                <h2 class="text-lg text-gray-200">Settings</h2>
-                <button
-                  onClick={() => setShowSettings(false)}
-                  class="text-gray-400 hover:text-white"
-                >
-                  ×
-                </button>
-              </div>
-              <div class="p-4">
-                <div class="space-y-4">
-                  <div class="flex items-center justify-between">
-                    <span class="text-gray-300">Theme</span>
-                    <select class="bg-[#2a2b36] text-gray-300 rounded px-2 py-1 border border-[rgba(255,255,255,0.1)]">
-                      <option>One Dark</option>
-                      <option>Light</option>
-                    </select>
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <span class="text-gray-300">Font Size</span>
-                    <input
-                      type="number"
-                      min="8"
-                      max="24"
-                      value="14"
-                      class="bg-[#2a2b36] text-gray-300 rounded px-2 py-1 w-20 border border-[rgba(255,255,255,0.1)]"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Editor and Terminal */}
-        <div class="flex-1">
-          <Split
-            class="h-full"
-            spacing={1}
-            gutterSize={4}
-            direction="vertical"
-            sizes={[70, 30]}
-          >
-            {/* Editor Panel */}
-            <div class="h-full flex flex-col">
-              <div class="toolbar px-4 py-2 flex items-center gap-4">
-                <div class="flex items-center gap-2 px-3 py-1 rounded tab-active">
-                  <span class="w-2 h-2 rounded-full bg-orange-400"></span>
-                  <span class="text-sm text-gray-200">{fileName()}</span>
-                </div>
-              </div>
-              <div ref={editorRef} class="flex-1 overflow-hidden" />
-            </div>
-
-            {/* Terminal Panel */}
-            <div class="h-full flex flex-col">
-              <div class="toolbar px-4 py-2 flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                  <button class="px-3 py-1 text-sm text-gray-200 tab-active rounded-t">Terminal</button>
-                  <button class="px-3 py-1 text-sm text-gray-400 hover:text-white">Problems</button>
-                  <button class="px-3 py-1 text-sm text-gray-400 hover:text-white">Output</button>
-                </div>
-                <div class="flex items-center gap-4">
-                  <button
-                    class="text-sm px-4 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white transition"
-                    onClick={handleCompileAndRun}
-                  >
-                    Compile & Run
-                  </button>
-                  <button
-                    class="text-sm px-4 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition"
-                    onClick={handleTranspile}
-                  >
-                    Transpile
-                  </button>
-                  <button
-                    class="text-sm px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-white transition"
-                    onClick={handleBuild}
-                  >
-                    Build
-                  </button>
-                </div>
-              </div>
-              <pre class="terminal flex-1 p-4 overflow-auto text-sm font-mono text-gray-400">
-                <div innerHTML={output()} />
-              </pre>
-            </div>
-          </Split>
+          {props.explanation && (
+            <span class="text-[#cdd6f4] text-sm">{props.explanation}</span>
+          )}
         </div>
       </div>
-
-      {/* Status Bar */}
-      <div class="toolbar h-6 flex items-center px-4 justify-between text-xs text-gray-400">
-        <div class="flex items-center gap-4">
-          <span>UTF-8</span>
-          <span>Blaze</span>
-          <span>Ln {cursorPos().line}, Col {cursorPos().col}</span>
+      {output() && (
+        <div class="bg-[#11111b] p-4 border-t border-[#313244]">
+          <pre class="text-[#cdd6f4] text-sm">{output()}</pre>
         </div>
-        <div class="flex items-center gap-4">
-          <span>{new Date().toLocaleTimeString()}</span>
-          <span>v1.0.0</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
-// Main component with error boundary
-export default function BlazeCodeEditor() {
+function AboutPage() {
+  const simpleExample = `// A simple hello world program
+println("Hello, Blaze!")!`;
+
+  const variableExample = `// Variable assignment examples
+// example with <- operator
+x <- 42!
+// you can use let too!
+let name = "Blaze"!
+println(x)!
+println(name)!`;
+
+  const controlFlowExample = `// Control flow example
+x <- 42!
+if x > 0 [
+    println("x is positive")!
+] else [
+    println("x is not positive")!
+]`;
+
+  const httpExample = `// HTTP request example
+import net/http!
+import io!
+
+url <- "https://api.github.com"!
+try [
+    response <- http::Get(url)!
+    body <- io::ReadAll(response.Body)!
+    println("Status: " + response.Status)!
+    println("Body: " + string(body))!
+] catch err [
+    println("Error: " + err.Error())!
+]`;
+
   return (
-    <ErrorBoundary fallback={err => <div class="text-red-500">Error: {err.message}</div>}>
-      <BlazeCodeEditorContent />
-    </ErrorBoundary>
+    <div class="min-h-screen bg-[#1e1e2e]">
+      {/* Navigation Sidebar */}
+      <nav class="fixed w-64 h-full bg-[#181825] border-r border-[#313244] overflow-y-auto">
+        <div class="p-6">
+          <h1 class="text-2xl font-bold text-[#f5e0dc]">Blaze Book</h1>
+          <a class="text-[#f5e0dc] mb-8 pb-4 text-xl" href="/ide">Go back to the IDE</a>
+          <ul class="space-y-4">
+            <li>
+              <a href="#introduction" class="text-[#89b4fa] hover:text-[#74c7ec]">
+                1. Introduction
+              </a>
+            </li>
+            <li>
+              <a href="#getting-started" class="text-[#89b4fa] hover:text-[#74c7ec]">
+                2. Getting Started
+              </a>
+            </li>
+            <li>
+              <a href="#basic-concepts" class="text-[#89b4fa] hover:text-[#74c7ec]">
+                3. Basic Concepts
+              </a>
+              <ul class="ml-4 mt-2 space-y-2">
+                <li>
+                  <a href="#variables" class="text-[#cdd6f4] hover:text-[#89b4fa]">
+                    3.1. Variables
+                  </a>
+                </li>
+                <li>
+                  <a href="#control-flow" class="text-[#cdd6f4] hover:text-[#89b4fa]">
+                    3.2. Control Flow
+                  </a>
+                </li>
+              </ul>
+            </li>
+            <li>
+              <a href="#standard-library" class="text-[#89b4fa] hover:text-[#74c7ec]">
+                4. Standard Library
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main class="ml-64 p-8">
+        <div class="max-w-4xl mx-auto">
+          <section id="introduction" class="mb-12">
+            <h1 class="text-4xl font-bold text-[#f5e0dc]">
+              Introduction to Blaze 🔥
+            </h1>
+            <p class="text-[#cdd6f4] mb-6 text-2xl">
+              Blazingly fast.
+            </p>
+            <a 
+      href="/ide" 
+      class="flex items-center space-x-2 px-4 py-2 
+      bg-[#89b4fa] text-[#1e1e2e] 
+      rounded hover:bg-[#74c7ec] 
+      transition duration-300 
+      font-medium
+      max-w-max"
+    >
+      <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width="20" 
+        height="20" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+      >
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="12" y1="8" x2="12" y2="16"></line>
+        <line x1="8" y1="12" x2="16" y2="12"></line>
+      </svg>
+      <span>Open IDE</span>
+    </a>
+            <p class="text-[#cdd6f4] mb-6">
+              Blaze is a modern programming language that is supposed to be powerful and fast but without sacrificing readability.
+            </p>
+            <InteractiveCode
+              code={simpleExample}
+              explanation="Try running this Hello World program!"
+            />
+          </section>
+
+          <section id="basic-concepts" class="mb-12">
+            <h2 class="text-3xl font-semibold text-[#f5c2e7] mb-6">Basic Concepts</h2>
+
+            <section id="variables" class="mb-8">
+              <h3 class="text-2xl font-medium text-[#89b4fa] mb-4">Variables</h3>
+              <p class="text-[#cdd6f4] mb-4">
+                In Blaze, variables can be declared using either the arrow operator (<code class="bg-[#313244] px-2 py-1 rounded">&lt;-</code>)
+                or the <code class="bg-[#313244] px-2 py-1 rounded">let</code> keyword:
+              </p>
+              <InteractiveCode
+                code={variableExample}
+                explanation="Run to see how variable declaration works"
+              />
+            </section>
+
+            <section id="control-flow" class="mb-8">
+              <h3 class="text-2xl font-medium text-[#89b4fa] mb-4">Control Flow</h3>
+              <p class="text-[#cdd6f4] mb-4">
+                Blaze uses square brackets <code class="bg-[#313244] px-2 py-1 rounded">[]</code> for code blocks:
+              </p>
+              <InteractiveCode
+                code={controlFlowExample}
+                explanation="Try this control flow example"
+              />
+            </section>
+          </section>
+
+          <section id="standard-library" class="mb-12">
+            <h2 class="text-3xl font-semibold text-[#f5c2e7] mb-6">Standard Library</h2>
+            <p class="text-[#cdd6f4] mb-4">
+              Blaze comes with a powerful standard library. Here's an example using the HTTP client:
+            </p>
+            <InteractiveCode
+              code={httpExample}
+              explanation="Make an HTTP request to GitHub's API"
+            />
+            <p class="text-[#cdd6f4] mb-4">
+              You can use every library from Golang's standard library with no configuration needed.
+            </p>
+          </section>
+          <a 
+      href="/ide" 
+      class="flex items-center space-x-2 px-4 py-2 
+      bg-[#89b4fa] text-[#1e1e2e] 
+      rounded hover:bg-[#74c7ec] 
+      transition duration-300 
+      font-medium
+      max-w-max"
+    >
+      <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width="20" 
+        height="20" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+      >
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="12" y1="8" x2="12" y2="16"></line>
+        <line x1="8" y1="12" x2="16" y2="12"></line>
+      </svg>
+      <span>Open IDE</span>
+    </a>
+        </div>
+      </main>
+    </div>
   );
 }
+
+export default AboutPage;
