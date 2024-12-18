@@ -10,6 +10,7 @@ import { StreamLanguage } from '@codemirror/language';
 import { LanguageSupport } from '@codemirror/language';
 import { styleTags, tags as t } from '@lezer/highlight';
 import { editorStyles, blazeLanguage, blazeTheme } from '~/components/editor';
+import { useNavigate } from '@solidjs/router';
 
 
 
@@ -22,6 +23,12 @@ function BlazeCodeEditorContent() {
   const [output, setOutput] = createSignal('');
   const [fileName, setFileName] = createSignal('main.blz');
   const [cursorPos, setCursorPos] = createSignal({ line: 1, col: 1 });
+  const navigate = useNavigate();
+  const [showFileMenu, setShowFileMenu] = createSignal(false);
+  const [showSettings, setShowSettings] = createSignal(false);
+
+
+
 
   const initialCode = `import net/http!
 import io!
@@ -72,7 +79,25 @@ if x == 1 [
       }
     });
   });
+  const handleNewFile = () => {
+    editorView.dispatch({
+      changes: {
+        from: 0,
+        to: editorView.state.doc.length,
+        insert: ''
+      }
+    });
+    setFileName('untitled.blz');
+    setShowFileMenu(false);
+  };
 
+  const handleRename = () => {
+    const newName = prompt('Enter new file name:', fileName());
+    if (newName) {
+      setFileName(newName);
+    }
+    setShowFileMenu(false);
+  };
   const handleFileImport = async (event) => {
     const target = event.target;
     const file = target.files?.[0];
@@ -228,22 +253,46 @@ if x == 1 [
             Blaze <span class="text-xl">🔥</span>
           </h1>
           <div class="flex gap-4 ml-8">
-            <button class="text-sm text-gray-400 hover:text-white">File</button>
-            <button class="text-sm text-gray-400 hover:text-white">Edit</button>
-            <button class="text-sm text-gray-400 hover:text-white">View</button>
-            <button class="text-sm text-gray-400 hover:text-white">Help</button>
-          </div>
-          <div class="flex items-center gap-2 ml-8">
+            <div class="relative">
+              <button
+                class="text-sm text-gray-400 hover:text-white"
+                onClick={() => setShowFileMenu(!showFileMenu())}
+              >
+                File
+              </button>
+
+              {/* File Menu Dropdown */}
+              {showFileMenu() && (
+                <div class="absolute top-full left-0 mt-1 w-48 bg-[#1a1b26] rounded-md shadow-lg border border-[rgba(255,255,255,0.1)] py-1 z-50">
+                  <button
+                    class="w-full px-4 py-2 text-sm text-gray-300 hover:bg-[rgba(255,255,255,0.1)] text-left"
+                    onClick={handleNewFile}
+                  >
+                    New File
+                  </button>
+                  <button
+                    class="w-full px-4 py-2 text-sm text-gray-300 hover:bg-[rgba(255,255,255,0.1)] text-left"
+                    onClick={() => fileInputRef.click()}
+                  >
+                    Open File...
+                  </button>
+                  <button
+                    class="w-full px-4 py-2 text-sm text-gray-300 hover:bg-[rgba(255,255,255,0.1)] text-left"
+                    onClick={handleRename}
+                  >
+                    Rename...
+                  </button>
+                </div>
+              )}
+            </div>
             <button
-              onClick={() => fileInputRef.click()}
-              class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]"
-              title="Import .blz File"
+              class="text-sm text-gray-400 hover:text-white"
+              onClick={() => navigate('/about')}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
+              Help
             </button>
           </div>
+
         </div>
         <div class="flex items-center gap-2">
           <span class="text-sm text-gray-400">User</span>
@@ -266,12 +315,54 @@ if x == 1 [
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
             </svg>
           </button>
-          <button class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]">
+          {/* <button
+            class="p-2 rounded hover:bg-[rgba(255,255,255,0.1)]"
+            onClick={() => setShowSettings(!showSettings())}
+            title="Settings"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
-          </button>
+          </button> */}
+
         </div>
+
+        {showSettings() && (
+          <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-[#1a1b26] w-96 rounded-lg shadow-lg border border-[rgba(255,255,255,0.1)]">
+              <div class="flex justify-between items-center px-4 py-3 border-b border-[rgba(255,255,255,0.1)]">
+                <h2 class="text-lg text-gray-200">Settings</h2>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  class="text-gray-400 hover:text-white"
+                >
+                  ×
+                </button>
+              </div>
+              <div class="p-4">
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-300">Theme</span>
+                    <select class="bg-[#2a2b36] text-gray-300 rounded px-2 py-1 border border-[rgba(255,255,255,0.1)]">
+                      <option>One Dark</option>
+                      <option>Light</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-300">Font Size</span>
+                    <input
+                      type="number"
+                      min="8"
+                      max="24"
+                      value="14"
+                      class="bg-[#2a2b36] text-gray-300 rounded px-2 py-1 w-20 border border-[rgba(255,255,255,0.1)]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Editor and Terminal */}
         <div class="flex-1">
