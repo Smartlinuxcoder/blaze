@@ -2,7 +2,7 @@ import net/http!
 import io!
 
 
-url <- "http://letsgosky.social"!
+url <- "https://api.github.com"!
 try [
     // this is a commment, this gets sent to the transpiled version too
     response <- http::Get(url)!
