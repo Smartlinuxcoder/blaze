@@ -101,6 +101,7 @@ function InteractiveCode(props) {
 }
 
 function AboutPage() {
+  const [isNavOpen, setIsNavOpen] = createSignal(false);
   const simpleExample = `// A simple hello world program
 println("Hello, Blaze!")!`;
 
@@ -134,10 +135,41 @@ try [
     println("Error: " + err.Error())!
 ]`;
 
+  const toggleNav = () => {
+    setIsNavOpen(!isNavOpen());
+  };
+
   return (
     <div class="min-h-screen bg-[#1e1e2e]">
+      <button 
+        onClick={toggleNav}
+        class="md:hidden fixed top-4 left-4 z-50 p-2 bg-[#181825] rounded-lg border border-[#313244]"
+      >
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          width="24" 
+          height="24" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          stroke-width="2" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" 
+          class="text-[#f5e0dc]"
+        >
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+
       {/* Navigation Sidebar */}
-      <nav class="fixed w-64 h-full bg-[#181825] border-r border-[#313244] overflow-y-auto">
+      <nav class={`
+        fixed w-64 h-full bg-[#181825] border-r border-[#313244] overflow-y-auto
+        transform transition-transform duration-300 ease-in-out
+        md:translate-x-0 z-40
+        ${isNavOpen() ? 'translate-x-0' : '-translate-x-full'}
+      `}>
         <div class="p-6">
           <h1 class="text-2xl font-bold text-[#f5e0dc]">Blaze Book</h1>
           <a class="text-[#f5e0dc] mb-8 pb-4 text-xl" href="/ide">Go back to the IDE</a>
@@ -179,8 +211,8 @@ try [
       </nav>
 
       {/* Main Content */}
-      <main class="ml-64 p-8">
-        <div class="max-w-4xl mx-auto">
+      <main class="md:ml-64 p-4 md:p-8">
+        <div class="max-w-4xl mx-auto pt-16 md:pt-0">
           <section id="introduction" class="mb-12">
             <h1 class="text-4xl font-bold text-[#f5e0dc]">
               Introduction to Blaze 🔥
